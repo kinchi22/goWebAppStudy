@@ -8,15 +8,15 @@ import (
 type router struct {
 	// key: http method
 	// value: HandlerFunc
-	handlers map[string]map[string]http.HandlerFunc
+	handlers map[string]map[string]HandlerFunc
 }
 
-func (r *router) HandleFunc(method, pattern string, h http.HandlerFunc) {
+func (r *router) HandleFunc(method, pattern string, h HandlerFunc) {
 	// Check whether map is existing
 	m, ok := r.handlers[method]
 	if !ok {
 		// if no map, create new map
-		m = make(map[string]http.HandlerFunc)
+		m = make(map[string]HandlerFunc)
 		r.handlers[method] = m
 	}
 
@@ -27,8 +27,17 @@ func (r *router) HandleFunc(method, pattern string, h http.HandlerFunc) {
 // http.Handler interface
 func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	for pattern, handler := range r.handlers[req.Method] {
-		if ok, _ := match(pattern, req.URL.Path); ok {
-			handler(w, req)
+		if ok, params := match(pattern, req.URL.Path); ok {
+			// Make context
+			c := Context{
+				Params:         make(map[string]interface{}),
+				ResponseWriter: w,
+				Request:        req,
+			}
+			for k, v := range params {
+				c.Params[k] = v
+			}
+			handler(&c)
 			return
 		}
 	}
