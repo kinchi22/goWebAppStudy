@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -32,6 +34,31 @@ func recoverHandler(next HandlerFunc) HandlerFunc {
 					http.StatusInternalServerError)
 			}
 		}()
+		next(c)
+	}
+}
+
+func parseFormHandler(next HandlerFunc) HandlerFunc {
+	return func(c *Context) {
+		c.Request.ParseForm()
+		fmt.Println(c.Request.PostForm)
+		for k, v := range c.Request.PostForm {
+			if len(v) > 0 {
+				c.Params[k] = v[0]
+			}
+		}
+		next(c)
+	}
+}
+
+func parseJSONBodyHandler(next HandlerFunc) HandlerFunc {
+	return func(c *Context) {
+		var m map[string]interface{}
+		if json.NewDecoder(c.Request.Body).Decode(&m); len(m) > 0 {
+			for k, v := range m {
+				c.Params[k] = v
+			}
+		}
 		next(c)
 	}
 }
