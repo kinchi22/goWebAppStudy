@@ -24,25 +24,23 @@ func (r *router) HandleFunc(method, pattern string, h HandlerFunc) {
 	m[pattern] = h
 }
 
-// http.Handler interface
-func (r *router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	for pattern, handler := range r.handlers[req.Method] {
-		if ok, params := match(pattern, req.URL.Path); ok {
-			// Make context
-			c := Context{
-				Params:         make(map[string]interface{}),
-				ResponseWriter: w,
-				Request:        req,
+func (r *router) handler() HandlerFunc {
+	return func(c *Context) {
+		// Check all handlers by http method
+		for pattern, handler := range r.handlers[c.Request.Method] {
+			if ok, params := match(pattern, c.Request.URL.Path); ok {
+				for k, v := range params {
+					c.Params[k] = v
+				}
+				handler(c)
+				return
 			}
-			for k, v := range params {
-				c.Params[k] = v
-			}
-			handler(&c)
-			return
 		}
+
+		// Make NotFound error when it fails to find the handler
+		http.NotFound(c.ResponseWriter, c.Request)
+		return
 	}
-	http.NotFound(w, req)
-	return
 }
 
 func match(pattern, path string) (bool, map[string]string) {

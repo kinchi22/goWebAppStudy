@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
+	"strings"
 	"time"
 )
 
@@ -60,5 +62,66 @@ func parseJSONBodyHandler(next HandlerFunc) HandlerFunc {
 			}
 		}
 		next(c)
+	}
+}
+
+func staticHandler(next HandlerFunc) HandlerFunc {
+	var (
+		dir       = http.Dir(".")
+		indexFile = "index.html"
+	)
+
+	return func(c *Context) {
+		// go next handler if the http method is not GET or HEAD
+		if c.Request.Method != "GET" && c.Request.Method != "HEAD" {
+			next(c)
+			return
+		}
+
+		file := c.Request.URL.Path
+		// try to open the target file of URL path
+		f, err := dir.Open(file)
+		if err != nil {
+			next(c)
+			return
+		}
+		defer f.Close()
+
+		// check file's status
+		fi, err := f.Stat()
+		if err != nil {
+			next(c)
+			return
+		}
+
+		// use indexFile if the URL path is directory
+		if fi.IsDir() {
+			// it should have "/" to use directory path as an URL
+			if !strings.HasSuffix(c.Request.URL.Path, "/") {
+				http.Redirect(c.ResponseWriter, c.Request, c.Request.URL.Path+"/", http.StatusFound)
+				return
+			}
+
+			// join indexFile in URL path to generate entire file path
+			file = path.Join(file, indexFile)
+
+			// try to open the indexFile
+			f, err = dir.Open(file)
+			if err != nil {
+				next(c)
+				return
+			}
+			defer f.Close()
+
+			// check indexFile's status
+			fi, err = f.Stat()
+			if err != nil || fi.IsDir() {
+				next(c)
+				return
+			}
+		}
+
+		// send the content of the file w/o hand over to the next handler
+		http.ServeContent(c.ResponseWriter, c.Request, file, fi.ModTime(), f)
 	}
 }
