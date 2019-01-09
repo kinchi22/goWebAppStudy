@@ -4,6 +4,11 @@ import (
 	"fmt"
 )
 
+type User struct {
+	Id        string
+	AddressId string
+}
+
 func main() {
 	// Make server
 	s := NewServer()
@@ -18,10 +23,12 @@ func main() {
 		if c.Params["id"] == "0" {
 			panic("id is zero")
 		}
-		fmt.Fprintf(c.ResponseWriter, "retrieve user %v\n", c.Params["id"])
+		u := User{Id: c.Params["id"].(string)}
+		c.RenderXML(u)
 	})
 	s.HandleFunc("GET", "/users/:user_id/addresses/:address_id", func(c *Context) {
-		fmt.Fprintf(c.ResponseWriter, "retrieve user %v's address %v\n", c.Params["user_id"], c.Params["address_id"])
+		u := User{c.Params["user_id"].(string), c.Params["address_id"].(string)}
+		c.RenderJSON(u)
 	})
 	s.HandleFunc("POST", "/users", func(c *Context) {
 		fmt.Fprintln(c.ResponseWriter, c.Params)
